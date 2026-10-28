@@ -16,9 +16,9 @@ jobs:
       - name: Checkout project
         uses: actions/checkout@v4
 
-      - name: Extract project ZIP
+            - name: Extract project ZIP
         run: |
-          unzip ODC_AI_PREDICTOR_ONE_CLICK_BUILD.zip -d .
+          unzip -o ODC_AI_PREDICTOR_ONE_CLICK_BUILD.zip -d . -x '.github/workflows/build-apk.yml' './.github/workflows/build-apk.yml'
           ls -la
 
       - name: Set up Java
