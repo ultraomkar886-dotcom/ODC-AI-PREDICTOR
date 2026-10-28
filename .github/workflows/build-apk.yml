@@ -3,25 +3,52 @@ name: Build ODC AI PREDICTOR APK
 on:
   workflow_dispatch:
   push:
-    branches: [main, master]
+    branches:
+      - main
+      - master
 
 permissions:
   contents: read
 
 jobs:
   build:
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout project
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-            - name: Extract project ZIP
+      - name: Check project ZIP
         run: |
-          unzip -o ODC_AI_PREDICTOR_ONE_CLICK_BUILD.zip -d . -x '.github/workflows/build-apk.yml' './.github/workflows/build-apk.yml'
+          echo "Checking uploaded project..."
           ls -la
+          test -f ODC_AI_PREDICTOR_ONE_CLICK_BUILD.zip
 
-      - name: Set up Java
+      - name: Extract project ZIP safely
+        shell: bash
+        run: |
+          mkdir -p /tmp/odc-project
+          unzip -o ODC_AI_PREDICTOR_ONE_CLICK_BUILD.zip \
+            -d /tmp/odc-project
+
+          echo "Extracted project files:"
+          find /tmp/odc-project -maxdepth 3 -type f | head -80
+
+          test -d /tmp/odc-project/app
+
+          cp -a /tmp/odc-project/app .
+          cp -a /tmp/odc-project/build.gradle .
+          cp -a /tmp/odc-project/settings.gradle .
+          cp -a /tmp/odc-project/gradle.properties .
+
+          if [ -d /tmp/odc-project/gradle ]; then
+            cp -a /tmp/odc-project/gradle .
+          fi
+
+          echo "Project extraction completed."
+
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -30,19 +57,38 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager "platforms;android-35" \
+            "build-tools;35.0.0"
+          yes | sdkmanager --licenses || true
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
 
-      - name: Build APK
-        run: gradle --no-daemon assembleDebug
+      - name: Verify project files
+        run: |
+          test -f settings.gradle
+          test -f build.gradle
+          test -f app/build.gradle
+          test -f app/src/main/AndroidManifest.xml
+          echo "Required project files found."
+
+      - name: Build debug APK
+        run: |
+          gradle --no-daemon assembleDebug
+
+      - name: Check generated APK
+        run: |
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          ls -lh app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: ODC-AI-PREDICTOR-APK
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
